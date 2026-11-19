@@ -68,8 +68,23 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
   val routines: StateFlow<List<RoutineDto>> = repo.routinesFlow
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-  val activeWorkout: StateFlow<WorkoutSessionDto?> = repo.activeWorkoutFlow
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+  private val _startingSessionFallback = MutableStateFlow<WorkoutSessionDto?>(null)
+  private val _isClosingActiveWorkout = MutableStateFlow(false)
+
+  val activeWorkout: StateFlow<WorkoutSessionDto?> =
+    combine(repo.activeWorkoutFlow, _startingSessionFallback, _isClosingActiveWorkout) { roomActive, fallback, closing ->
+      if (closing) {
+        if (roomActive == null) {
+          _isClosingActiveWorkout.value = false
+        }
+        null
+      } else {
+        if (roomActive != null && fallback != null) {
+          _startingSessionFallback.value = null
+        }
+        roomActive ?: fallback
+      }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
   val completedWorkouts: StateFlow<List<WorkoutSessionDto>> = repo.completedWorkoutsFlow
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -172,7 +187,9 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   // Workout Execution
   fun startWorkoutFromRoutine(routine: RoutineDto, onStarted: () -> Unit) = viewModelScope.launch {
+    _isClosingActiveWorkout.value = false
     val session = repo.startWorkoutFromRoutine(routine, completedWorkouts.value)
+    _startingSessionFallback.value = session
     val pref = preferences.value
     WorkoutTimerService.startWorkoutService(
       context = app,
@@ -186,8 +203,10 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun startEmptyWorkout(onStarted: () -> Unit) = viewModelScope.launch {
+    _isClosingActiveWorkout.value = false
     val title = if (preferences.value.language == AppLanguage.RU) "Свободная тренировка" else "Freestyle Workout"
     val session = repo.startEmptyWorkout(title)
+    _startingSessionFallback.value = session
     val pref = preferences.value
     WorkoutTimerService.startWorkoutService(
       context = app,
@@ -403,6 +422,8 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   fun finishActiveWorkout() = viewModelScope.launch {
     val cur = activeWorkout.value ?: return@launch
+    _isClosingActiveWorkout.value = true
+    _startingSessionFallback.value = null
     val oldPrs = personalRecords.value
     val finished = repo.finishWorkout(cur)
     WorkoutTimerService.stopWorkoutService(app)
@@ -433,6 +454,8 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   fun discardActiveWorkout() = viewModelScope.launch {
     val cur = activeWorkout.value ?: return@launch
+    _isClosingActiveWorkout.value = true
+    _startingSessionFallback.value = null
     repo.discardActiveWorkout(cur)
     WorkoutTimerService.stopWorkoutService(app)
   }

@@ -1,7 +1,9 @@
 package com.example
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.room.Room
@@ -53,6 +55,53 @@ class ExampleRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("settings_button").performClick()
     composeTestRule.waitForIdle()
+  }
+
+  @Test
+  fun `starting and exiting empty workout returns to train tab content`() {
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("start_empty_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("start_empty_workout_button").performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("discard_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("discard_workout_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("confirm_discard_workout_button").performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("start_empty_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("start_empty_workout_button").assertIsDisplayed()
+
+    // Also test System Back + tab switching + Finish flow
+    composeTestRule.onNodeWithTag("start_empty_workout_button").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("finish_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.activityRule.scenario.onActivity { activity ->
+      activity.onBackPressedDispatcher.onBackPressed()
+    }
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("resume_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("nav_catalog").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("nav_train").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("resume_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("resume_workout_button").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("finish_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("finish_workout_button").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+      composeTestRule.onAllNodesWithTag("start_empty_workout_button").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeTestRule.onNodeWithTag("start_empty_workout_button").assertIsDisplayed()
   }
 
   @Test

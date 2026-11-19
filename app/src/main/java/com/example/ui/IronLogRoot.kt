@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -32,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -127,6 +130,39 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
       TopNavItem(RouteCalculators, strings.navTools, Icons.Filled.Calculate, "nav_calc"),
     )
 
+    fun navigateToTopTab(route: Any) {
+      if (route is RouteTrain) {
+        val poppedToTrain = navController.popBackStack<RouteTrain>(inclusive = false)
+        if (!poppedToTrain) {
+          navController.navigate(RouteTrain) {
+            popUpTo(navController.graph.startDestinationId) { inclusive = false }
+            launchSingleTop = true
+          }
+        }
+      } else {
+        navController.navigate(route) {
+          popUpTo<RouteTrain> { saveState = true }
+          launchSingleTop = true
+          restoreState = true
+        }
+      }
+    }
+
+    fun openActiveWorkout() {
+      navController.navigate(RouteActiveWorkout) {
+        launchSingleTop = true
+      }
+    }
+
+    fun exitActiveWorkoutToTrain() {
+      val popped = navController.popBackStack<RouteActiveWorkout>(inclusive = true)
+      if (!popped && navController.currentBackStackEntry == null) {
+        navController.navigate(RouteTrain) {
+          launchSingleTop = true
+        }
+      }
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
       val useNavRail = maxWidth >= 600.dp
 
@@ -147,13 +183,7 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
                 }
                 NavigationBarItem(
                   selected = selected,
-                  onClick = {
-                    navController.navigate(item.route) {
-                      popUpTo<RouteTrain> { saveState = true }
-                      launchSingleTop = true
-                      restoreState = true
-                    }
-                  },
+                  onClick = { navigateToTopTab(item.route) },
                   icon = { Icon(item.icon, contentDescription = item.label) },
                   label = { Text(item.label, maxLines = 1) },
                   modifier = Modifier.testTag(item.tag),
@@ -181,13 +211,7 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
                 }
                 NavigationRailItem(
                   selected = selected,
-                  onClick = {
-                    navController.navigate(item.route) {
-                      popUpTo<RouteTrain> { saveState = true }
-                      launchSingleTop = true
-                      restoreState = true
-                    }
-                  },
+                  onClick = { navigateToTopTab(item.route) },
                   icon = { Icon(item.icon, contentDescription = item.label) },
                   label = { Text(item.label) },
                   modifier = Modifier.testTag(item.tag),
@@ -214,17 +238,17 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
                 onStartEmptyWorkout = {
                   requestNotificationPermissionIfNeeded()
                   viewModel.startEmptyWorkout {
-                    navController.navigate(RouteActiveWorkout)
+                    openActiveWorkout()
                   }
                 },
                 onResumeActiveWorkout = {
                   requestNotificationPermissionIfNeeded()
-                  navController.navigate(RouteActiveWorkout)
+                  openActiveWorkout()
                 },
                 onStartRoutine = { routine ->
                   requestNotificationPermissionIfNeeded()
                   viewModel.startWorkoutFromRoutine(routine) {
-                    navController.navigate(RouteActiveWorkout)
+                    openActiveWorkout()
                   }
                 },
                 onSaveRoutine = viewModel::saveRoutine,
@@ -236,14 +260,20 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
             }
 
             composable<RouteActiveWorkout> {
-              val currentActive = activeWorkout
-              if (currentActive == null) {
-                LaunchedEffect(Unit) {
-                  navController.popBackStack()
+              var lastKnownSession by remember { mutableStateOf(activeWorkout) }
+              if (activeWorkout != null && activeWorkout != lastKnownSession) {
+                lastKnownSession = activeWorkout
+              }
+              val sessionToRender = activeWorkout ?: lastKnownSession
+              if (sessionToRender == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                  Button(onClick = { exitActiveWorkoutToTrain() }) {
+                    Text(strings.navWorkout)
+                  }
                 }
               } else {
                 ActiveWorkoutScreen(
-                  session = currentActive,
+                  session = sessionToRender,
                   strings = strings,
                   prefs = prefs,
                   catalogExercises = exercises,
@@ -267,11 +297,11 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
                   onSkipRestTimer = viewModel::skipRestTimer,
                   onFinishWorkout = {
                     viewModel.finishActiveWorkout()
-                    navController.popBackStack()
+                    exitActiveWorkoutToTrain()
                   },
                   onDiscardWorkout = {
                     viewModel.discardActiveWorkout()
-                    navController.popBackStack()
+                    exitActiveWorkoutToTrain()
                   },
                 )
               }

@@ -316,7 +316,9 @@ fun ActiveWorkoutScreen(
             }
             OutlinedButton(
               onClick = { showDiscardConfirm = true },
-              modifier = Modifier.height(48.dp),
+              modifier = Modifier
+                .height(48.dp)
+                .testTag("discard_workout_button"),
               colors = ButtonDefaults.outlinedButtonColors(contentColor = FailureCoral),
             ) {
               Icon(Icons.Filled.Close, contentDescription = null)
@@ -368,6 +370,7 @@ fun ActiveWorkoutScreen(
             onDiscardWorkout()
           },
           colors = ButtonDefaults.buttonColors(containerColor = FailureCoral),
+          modifier = Modifier.testTag("confirm_discard_workout_button"),
         ) { Text(strings.confirm) }
       },
       dismissButton = {
