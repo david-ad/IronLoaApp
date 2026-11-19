@@ -1,0 +1,6 @@
+{
+  "name": "IronLog",
+  "description": "Offline-first strength workout tracker for Android and Wear OS",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
