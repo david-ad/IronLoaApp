@@ -9,8 +9,11 @@ import androidx.compose.ui.test.performClick
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.IronLogDatabase
+import com.example.data.preferences.UserPreferences
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.data.repository.WorkoutRepository
+import com.example.telemetry.CrashReporter
+import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -136,5 +139,15 @@ class ExampleRobolectricTest {
     } finally {
       db.close()
     }
+  }
+
+  @Test
+  fun `crashlytics initializes and records telemetry safely`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    CrashReporter.init(context)
+    assertTrue(FirebaseApp.getApps(context).isNotEmpty())
+    CrashReporter.updatePreferences(UserPreferences())
+    CrashReporter.log("test_breadcrumb")
+    CrashReporter.recordNonFatal(IllegalArgumentException("test_non_fatal"), area = "unit_test")
   }
 }

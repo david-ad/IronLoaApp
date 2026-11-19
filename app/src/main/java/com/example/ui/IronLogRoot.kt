@@ -47,6 +47,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.telemetry.CrashReporter
 import com.example.ui.screens.ActiveWorkoutScreen
 import com.example.ui.screens.AnalyticsScreen
 import com.example.ui.screens.CalculatorsScreen
@@ -117,6 +118,22 @@ fun IronLogRoot(viewModel: IronLogViewModel) {
       statusBanner?.let { msg ->
         snackbarHostState.showSnackbar(msg)
         viewModel.clearStatusBanner()
+      }
+    }
+
+    val currentDest = backStackEntry?.destination
+    LaunchedEffect(currentDest?.route) {
+      val screenName = when {
+        currentDest?.hasRoute<RouteTrain>() == true -> "Train"
+        currentDest?.hasRoute<RouteCatalog>() == true -> "Catalog"
+        currentDest?.hasRoute<RouteHistory>() == true -> "History"
+        currentDest?.hasRoute<RouteAnalytics>() == true -> "Analytics"
+        currentDest?.hasRoute<RouteCalculators>() == true -> "Calculators"
+        currentDest?.hasRoute<RouteActiveWorkout>() == true -> "ActiveWorkout"
+        else -> null
+      }
+      if (screenName != null) {
+        CrashReporter.log("nav:$screenName")
       }
     }
 

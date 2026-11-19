@@ -5,6 +5,8 @@ import com.example.data.local.IronLogDatabase
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.data.repository.WorkoutRepository
 import com.example.sync.WearSyncManager
+import com.example.telemetry.CrashReporter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,8 +26,15 @@ class IronLogApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    CrashReporter.init(this)
     appScope.launch {
-      workoutRepository.ensureSeeded()
+      try {
+        workoutRepository.ensureSeeded()
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        CrashReporter.recordNonFatal(e, area = "db_seed")
+      }
     }
   }
 }

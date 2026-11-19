@@ -27,6 +27,7 @@ import com.example.ironlog.core.model.WorkoutSetDto
 import com.example.service.TimerServiceState
 import com.example.service.WorkoutTimerService
 import com.example.sync.WearSyncStatus
+import com.example.telemetry.CrashReporter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -115,6 +116,11 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   init {
     viewModelScope.launch {
+      prefs.preferencesFlow.collect { pref ->
+        CrashReporter.updatePreferences(pref)
+      }
+    }
+    viewModelScope.launch {
       repo.ensureSeeded()
     }
     // Keep elapsed workout clock accurate locally even before/without FGS binding
@@ -187,6 +193,7 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   // Workout Execution
   fun startWorkoutFromRoutine(routine: RoutineDto, onStarted: () -> Unit) = viewModelScope.launch {
+    CrashReporter.log("workout_start:routine")
     _isClosingActiveWorkout.value = false
     val session = repo.startWorkoutFromRoutine(routine, completedWorkouts.value)
     _startingSessionFallback.value = session
@@ -203,6 +210,7 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun startEmptyWorkout(onStarted: () -> Unit) = viewModelScope.launch {
+    CrashReporter.log("workout_start:empty")
     _isClosingActiveWorkout.value = false
     val title = if (preferences.value.language == AppLanguage.RU) "Свободная тренировка" else "Freestyle Workout"
     val session = repo.startEmptyWorkout(title)
@@ -422,6 +430,7 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   fun finishActiveWorkout() = viewModelScope.launch {
     val cur = activeWorkout.value ?: return@launch
+    CrashReporter.log("workout_finish")
     _isClosingActiveWorkout.value = true
     _startingSessionFallback.value = null
     val oldPrs = personalRecords.value
@@ -454,6 +463,7 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
 
   fun discardActiveWorkout() = viewModelScope.launch {
     val cur = activeWorkout.value ?: return@launch
+    CrashReporter.log("workout_discard")
     _isClosingActiveWorkout.value = true
     _startingSessionFallback.value = null
     repo.discardActiveWorkout(cur)
@@ -500,6 +510,9 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
     val lang = preferences.value.language
     val decoded = BackupCodec.decodeAndVerifyBackup(rawJson)
     if (decoded.isFailure) {
+      decoded.exceptionOrNull()?.let { err ->
+        CrashReporter.recordNonFatal(err, area = "backup_import")
+      }
       _statusBanner.value = if (lang == AppLanguage.RU) {
         "Ошибка проверки файла: ${decoded.exceptionOrNull()?.message}"
       } else {
@@ -507,6 +520,7 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
       }
       return@launch
     }
+    CrashReporter.log("backup_import_success")
     val (rCount, sCount) = repo.mergeIncomingEnvelope(decoded.getOrThrow())
     _statusBanner.value = if (lang == AppLanguage.RU) {
       "Восстановлено: $rCount программ, $sCount тренировок"
@@ -516,6 +530,7 @@ class IronLogViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun wipeAllData() = viewModelScope.launch {
+    CrashReporter.log("wipe_all_data")
     WorkoutTimerService.stopWorkoutService(app)
     repo.wipeAllData()
     val lang = preferences.value.language

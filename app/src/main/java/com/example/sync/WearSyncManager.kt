@@ -5,6 +5,7 @@ import com.example.data.preferences.UserPreferencesRepository
 import com.example.data.repository.WorkoutRepository
 import com.example.ironlog.core.backup.BackupCodec
 import com.example.ironlog.core.model.WearSyncAck
+import com.example.telemetry.CrashReporter
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.wearable.PutDataMapRequest
@@ -54,7 +55,8 @@ class WearSyncManager(
       val names = nodes.map { it.displayName }
       _status.value = WearSyncStatus.Connected(names, System.currentTimeMillis())
       names
-    }.getOrElse {
+    }.getOrElse { err ->
+      CrashReporter.recordNonFatal(err, area = "wear_nodes")
       _status.value = WearSyncStatus.Unavailable("Wearable Data Layer unavailable")
       emptyList()
     }
@@ -94,12 +96,19 @@ class WearSyncManager(
       _status.value = WearSyncStatus.Connected(nodes.map { it.displayName }, System.currentTimeMillis())
       envelope.routines.size to envelope.sessions.size
     }.onFailure { err ->
+      if (err !is IllegalStateException) {
+        CrashReporter.recordNonFatal(err, area = "wear_sync")
+      }
       _status.value = WearSyncStatus.Unavailable(err.message ?: "Sync failed")
     }
   }
 
   suspend fun handleIncomingPayload(rawJson: String, sourceNodeId: String?) {
-    val parsed = BackupCodec.decodeWearSync(rawJson).getOrNull() ?: return
+    val parsedResult = BackupCodec.decodeWearSync(rawJson)
+    val parsed = parsedResult.getOrElse { err ->
+      CrashReporter.recordNonFatal(err, area = "wear_decode")
+      return
+    }
     val (routinesImported, sessionsImported) = repository.mergeIncomingEnvelope(parsed)
     if (routinesImported > 0 || sessionsImported > 0) {
       prefs.setLastSyncEpochMs(System.currentTimeMillis())
