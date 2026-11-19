@@ -10,14 +10,21 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.ironlog.kxmpzq"
+    applicationId = "com.ideas1000.ironlog"
     minSdk = 30
     targetSdk = 36
-    versionCode = 1
+    versionCode = 20002
     versionName = "1.0"
   }
 
   signingConfigs {
+    create("release") {
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      storeFile = file(keystorePath)
+      storePassword = System.getenv("STORE_PASSWORD")
+      keyAlias = "upload"
+      keyPassword = System.getenv("KEY_PASSWORD")
+    }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
@@ -28,8 +35,10 @@ android {
 
   buildTypes {
     release {
+      isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      signingConfig = signingConfigs.getByName("release")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
@@ -43,6 +52,10 @@ android {
 
   buildFeatures {
     compose = true
+  }
+  dependenciesInfo {
+    includeInApk = false
+    includeInBundle = true
   }
 }
 
